@@ -1,0 +1,89 @@
+//"C:\Program Files (x86)\Webex\Record Playback\AtAuthor.exe" -PLAYER
+lclr
+dbh
+bphwc
+bc
+
+var vlogfile
+var vHandle
+var vlogSetFilePointer
+
+mov vlogfile,	"log-ReadFile.csv"
+mov vlogSetFilePointer,	"log-SetFilePointer.csv"
+wrt vlogfile,"FileHandle,BufferPointer,ReadSize"
+wrt vlogSetFilePointer,"FileHandle,Offset"
+
+gpa "CreateFileW","kernelbase.dll"
+bp $RESULT
+bpgoto $RESULT, lab_createfile
+
+
+NextBP:
+	ERUN
+
+/*
+00208248   755F3FA6  /CALL 到 CreateFileW 来自 kernel32.755F3FA1
+0020824C   00208388  |FileName = "C:\Windows\Registration\R000000000006.clb"
+00208250   80000000  |Access = GENERIC_READ
+00208254   00000001  |ShareMode = FILE_SHARE_READ
+00208258   00000000  |pSecurity = NULL
+0020825C   00000003  |Mode = OPEN_EXISTING
+00208260   00000000  |Attributes = 0
+00208264   00000000  \hTemplateFile = NULL
+
+002EB2D0   755F3F27  /CALL 到 ReadFile 来自 kernel32.755F3F22
+002EB2D4   0000019C  |hFile = 0000019C (window)
+002EB2D8   002EB33C  |Buffer = 002EB33C
+002EB2DC   0000003C  |BytesToRead = 3C (60.)
+002EB2E0   002EB380  |pBytesRead = 002EB380
+002EB2E4   00000000  \pOverlapped = NULL
+
+0113C8AC   574D462C  返回到 atrecply.574D462C 来自 kernel32.SetFilePointerEx
+0113C8B0   00000BC0
+0113C8B4   00001063
+0113C8B8   00000000
+
+*/
+
+lab_createfile:
+	gstrw [esp+4]
+	mov vFileName,$RESULT
+	scmp vFileName, "D:\tools\sampel\vul.wrf", 23
+	jne lab_GetFileHandle
+	rtr
+	mov vHandle,eax
+	eval "createfile {vFileName} file handle {vHandle}"
+	log $RESULT
+	gpa "ReadFile","kernelbase.dll"
+	bp $RESULT
+	bpgoto $RESULT, lab_readfile		//condition break pointer for ReadFile
+	gpa "SetFilePointerEx", "kernel32.dll"
+	bp $RESULT
+	bpgoto $RESULT, lab_setfilepointerex	//condition break pointer for SetFilePointerEx
+lab_GetFileHandle:
+	jmp NextBP
+
+lab_readfile:
+	cmp vHandle,[esp+4]
+	jne NextBP
+	mov vFileHandle,[esp+4]
+	mov vBuffer,[esp+8]
+	mov vReadSize,[esp+c]
+	eval "{vFileHandle},{vBuffer},{vReadSize}"
+	wrta vlogfile,$RESULT
+	//log [esp+4],"FileHandle = "
+	//log [esp+8],"buffer = "
+	//log [esp+c],"size = "
+	jmp NextBP
+
+lab_setfilepointerex:
+	cmp vHandle,[esp+4]
+	jne NextBP
+	mov vFileHandle,[esp+4]
+	mov vFilePointer,[esp+8]
+	eval "{vFileHandle},{vFilePointer}"
+	wrta vlogSetFilePointer,$RESULT
+	//log [esp+4],"FileHandle = "
+	//log [esp+8],"pFilePointer = "
+	jmp NextBP
+	
